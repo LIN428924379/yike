@@ -1,0 +1,10 @@
+{
+	"appId": "com.tomato.focus",
+	"appName": "一刻",
+	"webDir": "www",
+	"plugins": {
+		"SystemBars": {
+			"insetsHandling": "disable"
+		}
+	}
+}

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      基础主题。
+      颜色直接写成字面值 —— 原来的模板引用了 @color/colorPrimary 这些
+      项目里并不存在的资源，状态栏于是掉回系统默认的灰色，看起来就不是全屏。
+      现在状态栏取 App 顶部的颜色、导航栏取底部 tab 的颜色，上下就接上了。
+    -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#171A21</item>
+        <item name="colorPrimaryDark">#0F1116</item>
+        <item name="colorAccent">#FF5A4D</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:statusBarColor">#171A21</item>
+        <item name="android:navigationBarColor">#12151C</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:statusBarColor">#171A21</item>
+        <item name="android:navigationBarColor">#12151C</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- 启动画面：首屏是黑底，状态栏也跟着黑 -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
