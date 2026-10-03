@@ -20,7 +20,7 @@
 **安卓**：下载 Releases 里的 `一刻.apk`，直接安装。
 
 **iPhone / 电脑**：直接打开网页版 ——
-`https://<你的用户名>.github.io/<仓库名>/`
+`https://lin428924379.github.io/yike/`
 用 Safari 打开后点「添加到主屏幕」，看起来就和 App 一样。
 
 > ⚠️ 网页版在 iPhone 上有个限制：**切到后台或锁屏后，时间到了不会响**。
