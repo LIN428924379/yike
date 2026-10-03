@@ -1,0 +1,16 @@
+.gradle-home/
+.npm-cache/
+android-app/node_modules/
+android-app/android/.gradle/
+android-app/android/build/
+android-app/android/app/build/
+android-app/android/local.properties
+assets-src/tip-qr-source.jpg
+assets-src/tip-qr.png
+.recon/
+build-log*.txt
+*.apk
+.check/
+.shot/
+Thumbs.db
+desktop.ini
