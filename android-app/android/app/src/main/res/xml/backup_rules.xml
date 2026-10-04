@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 及以下的系统备份规则。
+
+  两个要点：
+  1. 一定要带上 app_webview/ —— App 的数据（任务、记录、设置）全存在
+     WebView 的 localStorage 里，就在这个目录下。不带上它，备份等于没备。
+  2. 一定要排掉缓存 —— 系统备份有 25MB 的配额，超了会【静默失败、整份不备】，
+     缓存又大又没用，把配额撑爆就什么都保不住了。
+-->
+<full-backup-content>
+    <include domain="root" path="." />
+    <include domain="file" path="." />
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+    <include domain="external" path="." />
+
+    <exclude domain="root" path="cache" />
+    <exclude domain="root" path="code_cache" />
+    <exclude domain="root" path="app_webview/Default/Cache" />
+    <exclude domain="root" path="app_webview/Default/Code Cache" />
+    <exclude domain="root" path="app_webview/Default/Service Worker" />
+    <exclude domain="file" path="cache" />
+</full-backup-content>

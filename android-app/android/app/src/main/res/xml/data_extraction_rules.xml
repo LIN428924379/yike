@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 及以上的备份规则。分两段，用途不一样：
+
+  cloud-backup  —— 备份到手机厂商的云（小米云、华为云等）。
+                   有 25MB 配额，超了整份不备，所以缓存必须排掉。
+  device-transfer —— 手机对手机搬家（小米换机、手机克隆那种）。
+                     没有配额限制，换手机主要靠它。
+
+  两段都要带上 app_webview/：App 的数据全在 WebView 的 localStorage 里。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="root" path="." />
+        <include domain="file" path="." />
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="." />
+        <include domain="external" path="." />
+
+        <exclude domain="root" path="cache" />
+        <exclude domain="root" path="code_cache" />
+        <exclude domain="root" path="app_webview/Default/Cache" />
+        <exclude domain="root" path="app_webview/Default/Code Cache" />
+        <exclude domain="root" path="app_webview/Default/Service Worker" />
+        <exclude domain="file" path="cache" />
+    </cloud-backup>
+
+    <device-transfer>
+        <include domain="root" path="." />
+        <include domain="file" path="." />
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="." />
+        <include domain="external" path="." />
+
+        <exclude domain="root" path="cache" />
+        <exclude domain="root" path="code_cache" />
+        <exclude domain="root" path="app_webview/Default/Cache" />
+        <exclude domain="root" path="app_webview/Default/Code Cache" />
+        <exclude domain="root" path="app_webview/Default/Service Worker" />
+        <exclude domain="file" path="cache" />
+    </device-transfer>
+</data-extraction-rules>

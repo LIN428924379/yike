@@ -33,6 +33,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 RES = ROOT / "android-app" / "android" / "app" / "src" / "main" / "res"
 SOURCE = ROOT / "assets-src" / "icon-source.png"
+# 启动画面可以单独配一张源图：图标可以是白底，但 App 内部是深色的，
+# 白色启动画面会"闪一下白"再进深色界面，很突兀。有这张就用它。
+SPLASH_SOURCE = ROOT / "assets-src" / "icon-source-splash.png"
 
 WHITE = (255, 255, 255, 255)
 BLACK = (16, 16, 18, 255)
@@ -44,8 +47,14 @@ DARK_BOTTOM = (0, 0, 0)
 GLYPH = BLACK
 APP_NAME = "一刻"
 
-# 自适应图标：手绘图案在 108dp 画布上占多大（安卓的安全区是中间约 66%）
-ADAPTIVE_ART_RATIO = 0.74
+# 图案在自适应图标画布上占多大。
+# 注意：安卓只显示 108dp 画布中间约 66.7%（72dp），所以这个数字要比"看起来的"小。
+# 44% → 在桌面上看起来约占可见区的 66%，透气、极简。
+ADAPTIVE_ART_RATIO = 0.44
+# 传统桌面图标整个方块都可见，按同样的"视觉大小"换算回来，
+# 这样自适应版和传统版在桌面上看起来一样大（不用分别调两个数）。
+VISIBLE_RATIO = 0.667
+LEGACY_ART_RATIO = ADAPTIVE_ART_RATIO / VISIBLE_RATIO
 # 启动图里图标占短边的比例
 SPLASH_ART_RATIO = 0.34
 
@@ -57,15 +66,15 @@ ADAPTIVE_BASE = 108
 # --------------------------------------------------------------------------- #
 # 图案来源
 # --------------------------------------------------------------------------- #
-def load_art():
-    """返回 (图案, 背景色)。没有手绘图标就返回 (None, None)。
+def load_art(path: Path = SOURCE):
+    """返回 (图案, 背景色)。没有图就返回 (None, None)。
 
     会把四周和底色一样的空白裁掉 —— 有些图（比如"星球+光环"）图案只占画面
     中间一块，不裁的话缩到图标上会显得很小。
     """
-    if not SOURCE.exists():
+    if not path.exists():
         return None, None
-    art = Image.open(SOURCE).convert("RGBA")
+    art = Image.open(path).convert("RGBA")
     bg = art.getpixel((4, 4))[:3]
     return trim_to_art(art, bg), bg
 
@@ -148,9 +157,15 @@ def circle_mask(size: int) -> Image.Image:
 # 四种图
 # --------------------------------------------------------------------------- #
 def legacy_icon(size: int, art=None, bg=None, circular: bool = False) -> Image.Image:
-    """桌面图标：手绘图案铺满整张，或自己画的表盘。"""
+    """桌面图标：图案居中并留出边距，或自己画的表盘。
+
+    一定要留边距 —— 不留的话，圆角/圆形蒙版会正好切在图案上。
+    """
     if art is not None:
-        icon = fit_square(art, size, bg=bg)
+        inner = round(size * LEGACY_ART_RATIO)
+        small = fit_square(art, inner, bg=bg)
+        icon = Image.new("RGBA", (size, size), tuple(bg) + (255,))
+        icon.paste(small, ((size - inner) // 2, (size - inner) // 2), small)
     else:
         icon = gradient_rect(size, size, GRADIENT_TOP, GRADIENT_BOTTOM)
         draw_clock(ImageDraw.Draw(icon), size, size / 2, size / 2)
@@ -239,11 +254,19 @@ def main() -> int:
         print("（要先在 android-app 里跑过 npx cap add android）")
         return 1
 
-    art, bg = load_art()
-    if art is not None:
-        print(f"图案来源：{SOURCE.relative_to(ROOT)}  {art.size[0]}x{art.size[1]}  底色 #{bg[0]:02X}{bg[1]:02X}{bg[2]:02X}")
+    art, bg = load_art(SOURCE)
+    # 启动图可以有自己的源图；没有就用同一张
+    if SPLASH_SOURCE.exists():
+        splash_art, splash_bg = load_art(SPLASH_SOURCE)
     else:
-        print("图案来源：脚本自己画的表盘（没找到 assets-src/icon-source.png）")
+        splash_art, splash_bg = art, bg
+
+    if art is not None:
+        print(f"图标来源：{SOURCE.relative_to(ROOT)}  {art.size[0]}x{art.size[1]}  底色 #{bg[0]:02X}{bg[1]:02X}{bg[2]:02X}")
+    else:
+        print("图标来源：脚本自己画的表盘（没找到 assets-src/icon-source.png）")
+    if splash_art is not None and splash_art is not art:
+        print(f"启动图来源：{SPLASH_SOURCE.relative_to(ROOT)}  底色 #{splash_bg[0]:02X}{splash_bg[1]:02X}{splash_bg[2]:02X}")
 
     written: list[Path] = []
 
@@ -261,7 +284,7 @@ def main() -> int:
     for existing in sorted(RES.glob("drawable*/splash.png")):
         with Image.open(existing) as probe:
             width, height = probe.size
-        save(splash(width, height, art, bg), existing, written)
+        save(splash(width, height, splash_art, splash_bg), existing, written)
         print(f"  {existing.parent.name:22s} 启动图 {width}x{height}")
 
     adaptive_xml = """<?xml version="1.0" encoding="utf-8"?>

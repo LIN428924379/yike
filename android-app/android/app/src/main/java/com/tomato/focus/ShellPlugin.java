@@ -1,7 +1,15 @@
 package com.tomato.focus;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
+import android.media.AudioAttributes;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -27,6 +35,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  */
 @CapacitorPlugin(name = "Shell")
 public class ShellPlugin extends Plugin {
+
+    /** 到点提醒的通知通道 id。
+        换 id 是唯一的"改通道设置"的办法：建好之后系统不允许再改。
+        但试过两次换成 v3，两次通知都不响了 —— 所以退回 v2，不再动。 */
+    private static final String ALARM_CHANNEL_ID = "focus-alarm-v2";
 
     private float density() {
         return getActivity().getResources().getDisplayMetrics().density;
@@ -95,5 +108,151 @@ public class ShellPlugin extends Plugin {
             }
             call.resolve();
         });
+    }
+
+    /**
+     * 问一句：系统有没有把本 App 限制在省电模式里（也就是"允许后台耗电"关了没）。
+     */
+    @PluginMethod
+    public void checkBackgroundPower(final PluginCall call) {
+        JSObject out = new JSObject();
+        boolean ignoring = false;
+        try {
+            PowerManager power = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            if (power != null) {
+                ignoring = power.isIgnoringBatteryOptimizations(getContext().getPackageName());
+            }
+        } catch (Exception err) {
+            // 查不到就当"没限制"，别打扰用户
+            ignoring = true;
+        }
+        out.put("ignoring", ignoring);
+        call.resolve(out);
+    }
+
+    /**
+     * 弹出系统的「是否允许后台运行 / 忽略电池优化」对话框。
+     *
+     * 为什么必须做这一步：小米、华为这类系统，如果没把 App 加进"允许后台耗电"，
+     * 那么 App 被清掉之后，系统【不再叫醒它】—— 于是一切都排好了、权限也给了，
+     * 到点就是不响。而这个开关藏在设置里很深，让用户自己找太折磨人。
+     *
+     * ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 会直接弹一个系统对话框，
+     * 用户点一下「允许」就行 —— 比翻五层设置友好得多。
+     */
+    @PluginMethod
+    public void requestBackgroundPower(final PluginCall call) {
+        JSObject out = new JSObject();
+        boolean ignoring = false;
+        boolean opened = false;
+        try {
+            PowerManager power = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            String pkg = getContext().getPackageName();
+            if (power != null) ignoring = power.isIgnoringBatteryOptimizations(pkg);
+
+            if (!ignoring && getActivity() != null) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + pkg));
+                getActivity().startActivity(intent);
+                opened = true;
+            }
+        } catch (Exception err) {
+            // 打不开就退回让用户自己去设置里找
+        }
+        out.put("ignoring", ignoring);
+        out.put("opened", opened);
+        call.resolve(out);
+    }
+
+    /**
+     * 建好「到点提醒」的通知通道，并把结果告诉网页。
+     *
+     * 为什么自己建、不用通知插件：安卓的**铃声和震动模式是挂在通道上的**，
+     * 而 Capacitor 那个插件只能"开/关震动"，给不了自定义的震动节奏 ✗
+     * 铃声也只能填 res/raw 里的文件名，填 "default" 会被当成真去找一个叫
+     * default 的音频文件（找不到就变成静音通道 ✗ —— 之前那个 bug 就是这么来的）。
+     *
+     * 两个血的教训写在这里：
+     *  1. 通道【必须】建成功 —— 通知发到一个不存在的通道，系统会静默丢掉，
+     *     用户什么都看不到。所以设置铃声失败时，要退回一个"没有自定义铃声、
+     *     但至少存在"的通道，绝不能让 createNotificationChannel 被跳过。
+     *  2. 返回值必须能看出"到底建成功没有"，网页那边要靠它判断。
+     */
+    @PluginMethod
+    public void prepareAlarm(final PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("ok", false);
+        out.put("sound", false);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // 安卓 8 以下没有通道这个概念，直接用系统默认
+            out.put("ok", true);
+            call.resolve(out);
+            return;
+        }
+
+        try {
+            NotificationManager manager =
+                    (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) {
+                call.resolve(out);
+                return;
+            }
+
+            // 已经建好了就不动它（通道设置建好之后系统不允许改）
+            if (manager.getNotificationChannel(ALARM_CHANNEL_ID) != null) {
+                out.put("ok", true);
+                out.put("sound", true);
+                call.resolve(out);
+                return;
+            }
+
+            boolean soundOk = false;
+            try {
+                NotificationChannel channel = new NotificationChannel(
+                        ALARM_CHANNEL_ID, "到点提醒", NotificationManager.IMPORTANCE_HIGH);
+                channel.setDescription("番茄钟结束时提醒你");
+                channel.enableVibration(true);
+                channel.setVibrationPattern(new long[]{0, 700, 300, 700, 300, 700, 300, 1300});
+
+                // 铃声：用打包在 App 里的 pomodoro.wav（3.6 秒，音量拉满）
+                int soundId = getContext().getResources()
+                        .getIdentifier("pomodoro", "raw", getContext().getPackageName());
+                if (soundId != 0) {
+                    AudioAttributes attributes = new AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .build();
+                    channel.setSound(
+                            Uri.parse("android.resource://" + getContext().getPackageName() + "/" + soundId),
+                            attributes);
+                    soundOk = true;
+                }
+                manager.createNotificationChannel(channel);
+            } catch (Exception err) {
+                soundOk = false;
+            }
+
+            // 兜底：上面那步要是没建成，这里必须补一个"能用的"通道。
+            // 没有通道 = 通知被系统丢掉 = 用户什么都看不到。
+            if (manager.getNotificationChannel(ALARM_CHANNEL_ID) == null) {
+                try {
+                    NotificationChannel fallback = new NotificationChannel(
+                            ALARM_CHANNEL_ID, "到点提醒", NotificationManager.IMPORTANCE_HIGH);
+                    fallback.setDescription("番茄钟结束时提醒你");
+                    fallback.enableVibration(true);
+                    fallback.setVibrationPattern(new long[]{0, 700, 300, 700, 300, 700, 300, 1300});
+                    manager.createNotificationChannel(fallback);
+                } catch (Exception err) {
+                    // 实在建不了就没办法了，下面的 ok 会是 false
+                }
+            }
+
+            out.put("ok", manager.getNotificationChannel(ALARM_CHANNEL_ID) != null);
+            out.put("sound", soundOk);
+        } catch (Exception err) {
+            // 兜底失败
+        }
+        call.resolve(out);
     }
 }

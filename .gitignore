@@ -1,3 +1,4 @@
+# 构建缓存 —— 很大，绝对不要提交
 .gradle-home/
 .npm-cache/
 android-app/node_modules/
@@ -5,12 +6,35 @@ android-app/android/.gradle/
 android-app/android/build/
 android-app/android/app/build/
 android-app/android/local.properties
+
+# 收款码原图（私人，不能公开）
 assets-src/tip-qr-source.jpg
 assets-src/tip-qr.png
+
+# 私人文件
 .recon/
 build-log*.txt
+
+# ⚠️ 签名密钥和密码：绝对不能提交！
+#    仓库是公开的 —— 密钥泄露 = 任何人都能签一个假冒的「一刻」发出去。
+#    而且这两个文件一旦丢了，你的 App 就再也更新不了（商店拒收新包、
+#    老用户无法覆盖安装）。请单独备份到网盘 / U 盘。
+android-app/android/yike-release.keystore
+上架材料/签名密码-千万别丢.txt
+上架材料/.md5.txt
+上架材料/.cert.cer
+android-app/android/keystore.properties
+
+# 安装包：请用 GitHub Releases 发布，不要塞进仓库
 *.apk
+
+# 临时文件
 .check/
 .shot/
+.tmp-*
+*.tmp
+
+# 系统
 Thumbs.db
 desktop.ini
+.DS_Store

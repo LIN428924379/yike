@@ -128,33 +128,22 @@ BUILDERS = {"symbol": build_moneybook, "timer": build_focus}
 def build_from_source() -> bytes | None:
     """用 assets-src/icon-source.png 生成网页图标；没有就返回 None。
 
-    复用安卓图标那套逻辑：先裁掉四周空白，再等比放进正方形（不拉伸变形）。
+    复用安卓那套逻辑：裁掉四周空白、等比缩放，并按"传统图标"的比例留边距 ——
+    不留边距的话图案会顶到边缘，在浏览器标签页和"添加到主屏幕"上都不好看。
     """
     if not SOURCE.exists():
         return None
-    from make_android_icons import fit_square, trim_to_art
+    from make_android_icons import LEGACY_ART_RATIO, fit_square, trim_to_art
 
     art = Image.open(SOURCE).convert("RGBA")
     bg = art.getpixel((4, 4))[:3]
-    square = fit_square(trim_to_art(art, bg), SIZE, bg=bg)
-    square.putalpha(rounded_mask())
-    return encode(square)
-
-
-def build_from_source() -> bytes | None:
-    """用 assets-src/icon-source.png 生成网页图标；没有就返回 None。
-
-    复用安卓图标那套逻辑：先裁掉四周空白，再等比放进正方形（不拉伸变形）。
-    """
-    if not SOURCE.exists():
-        return None
-    from make_android_icons import fit_square, trim_to_art
-
-    art = Image.open(SOURCE).convert("RGBA")
-    bg = art.getpixel((4, 4))[:3]
-    square = fit_square(trim_to_art(art, bg), SIZE, bg=bg)
-    square.putalpha(rounded_mask())
-    return encode(square)
+    canvas = Image.new("RGBA", (SIZE, SIZE), tuple(bg) + (255,))
+    inner = round(SIZE * LEGACY_ART_RATIO)
+    small = fit_square(trim_to_art(art, bg), inner, bg=bg)
+    offset = (SIZE - inner) // 2
+    canvas.paste(small, (offset, offset), small)
+    canvas.putalpha(rounded_mask())
+    return encode(canvas)
 
 
 def inject(html: str, data_uri: str) -> str:
